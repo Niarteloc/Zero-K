@@ -149,12 +149,13 @@ end
 --------------------------------------------------------------------------------
 -- Mission handling
 --------------------------------------------------------------------------------
+local isRoguelike = (Spring.GetModOptions().roguelikebattleid and true) or false
 local isMission = (Spring.GetModOptions().singleplayercampaignbattleid and true) or false
 
 local PLAYER_ALLY_TEAM_ID = 0
 local PLAYER_TEAM_ID = 0
 local function KillTeam(teamID)
-	if isMission then
+	if isMission or isRoguelike then
 		if teamID == PLAYER_TEAM_ID then
 			GG.MissionGameOver(false)
 		end
@@ -167,7 +168,7 @@ local function SetGameOver(winningAllyTeamID)
 	if DEBUG_MSG then
 		Spring.Echo("GameOver", winningAllyTeamID)
 	end
-	if isMission then
+	if isMission or isRoguelike then
 		if winningAllyTeamID == PLAYER_ALLY_TEAM_ID then
 			GG.MissionGameOver(true)
 		end
@@ -315,7 +316,7 @@ local function DestroyAlliance(allianceID, delayLossToNextGameFrame)
 		if teamList == nil or (#teamList == 0) then
 			return -- empty allyteam, don't bother
 		end
-		
+
 		local explodeUnits = true
 		if GG.GalaxyCampaignHandler then
 			local defeatConfig = GG.GalaxyCampaignHandler.GetDefeatConfig(allianceID)
@@ -335,7 +336,7 @@ local function DestroyAlliance(allianceID, delayLossToNextGameFrame)
 				end
 			end
 		end
-		
+
 		if Spring.IsCheatingEnabled() then
 			EchoUIMessage("Game Over: DEBUG")
 			EchoUIMessage("Game Over: Allyteam " .. allianceID .. " has met the game over conditions.")
@@ -356,7 +357,7 @@ local function DestroyAlliance(allianceID, delayLossToNextGameFrame)
 
 			for i = 1, #teamList do
 				local t = teamList[i]
-				
+
 				if explodeUnits then
 					local teamUnits = spGetTeamUnits(t)
 					for j = 1, #teamUnits do
@@ -412,13 +413,13 @@ local function AddAllianceUnit(unitID, unitDefID, teamID)
 	end
 	local _, _, _, _, _, allianceID = spGetTeamInfo(teamID, false)
 	aliveCount[teamID] = aliveCount[teamID] + 1
-	
+
 	aliveValue[teamID] = aliveValue[teamID] + UnitDefs[unitDefID].metalCost
 
 	if CanAddCommander() and UnitDefs[unitDefID].customParams.commtype then
 		commsAlive[allianceID][unitID] = true
 	end
-	
+
 	if GG.GalaxyCampaignHandler and GG.GalaxyCampaignHandler.VitalUnit(unitID) then
 		vitalAlive[allianceID][unitID] = true
 	elseif vitalConstructorAllyTeam[allianceID] then
@@ -463,7 +464,7 @@ local function RemoveAllianceUnit(unitID, unitDefID, teamID, delayLossToNextGame
 	end
 	local _, _, _, _, _, allianceID = spGetTeamInfo(teamID, false)
 	aliveCount[teamID] = aliveCount[teamID] - 1
-	
+
 	aliveValue[teamID] = aliveValue[teamID] - UnitDefs[unitDefID].metalCost
 	if aliveValue[teamID] < 0 then
 		aliveValue[teamID] = 0
@@ -472,7 +473,7 @@ local function RemoveAllianceUnit(unitID, unitDefID, teamID, delayLossToNextGame
 	if UnitDefs[unitDefID].customParams.commtype then
 		commsAlive[allianceID][unitID] = nil
 	end
-	
+
 	if vitalAlive[allianceID] and vitalAlive[allianceID][unitID] then
 		vitalAlive[allianceID][unitID] = nil
 	end
@@ -480,7 +481,7 @@ local function RemoveAllianceUnit(unitID, unitDefID, teamID, delayLossToNextGame
 	if allianceID == chickenAllyTeamID then
 		return
 	end
-	
+
 	if campaignBattleID then
 		if CheckMissionDefeatOnUnitLoss(unitID, allianceID) then
 			Spring.Log(gadget:GetInfo().name, LOG.INFO, "<Game Over> Purging allyTeam " .. allianceID)
@@ -555,7 +556,7 @@ local function ProcessLastAlly()
 			end -- continue
 			local hasActiveTeam = false
 			local hasDroppedTeam = false
-			
+
 			local defeatConfig = GG.GalaxyCampaignHandler and GG.GalaxyCampaignHandler.GetDefeatConfig(allyTeamID)
 			if defeatConfig and defeatConfig.ignoreUnitLossDefeat then
 				hasActiveTeam = true
@@ -600,12 +601,12 @@ local function ProcessLastAlly()
 			end
 		until true
 	end -- for
-	
+
 	if #activeAllies > 1 and inactiveWinAllyTeam then
 		inactiveWinAllyTeam = false
 		Spring.SetGameRulesParam("inactivity_win", -1)
 	end
-	
+
 	if #activeAllies == 2 then
 		if revealed or activeAllies[1] == chickenAllyTeamID or activeAllies[2] == chickenAllyTeamID then
 			return
@@ -740,9 +741,9 @@ function gadget:Initialize()
 		end
 	end
 	CheckAllUnits()
-	
+
 	gadgetHandler:AddChatAction('inactivitywin', CheckInactivityWin, "")
-	
+
 	Spring.Log(gadget:GetInfo().name, LOG.INFO, "Game Over initialized")
 end
 
@@ -758,15 +759,15 @@ function gadget:GameFrame(n)
 		end
 		toDestroy[n] = nil
 	end
-	
-	
+
+
 	if alliancesToDestroy then
 		for i = 1, #alliancesToDestroy do
 			DestroyAlliance(alliancesToDestroy[i])
 		end
 		alliancesToDestroy = nil
 	end
-	
+
 	-- check for last ally:
 	-- end condition: only 1 ally with human players, no AIs in other ones
 	if (n % 45 == 0) then
